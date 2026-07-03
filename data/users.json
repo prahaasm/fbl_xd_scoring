@@ -1,0 +1,6 @@
+[
+  { "username": "admin", "password": "admin2026", "role": "admin" },
+  { "username": "referee1", "password": "court1", "role": "court1" },
+  { "username": "referee2", "password": "court2", "role": "court2" },
+  { "username": "referee3", "password": "court3", "role": "court3" }
+]

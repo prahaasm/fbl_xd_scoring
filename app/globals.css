@@ -1,26 +1,60 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --brand: #22c55e;
+  --brand-dark: #4ade80;
+  --card: #1e293b;
+  --card-hover: #263548;
+  --border: #334155;
+  --muted: #94a3b8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+@layer components {
+  .btn-primary {
+    @apply block w-full text-center rounded-2xl font-bold py-4 text-lg shadow-lg active:scale-[0.98] transition text-slate-900;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+  }
+  .btn-secondary {
+    @apply block w-full text-center rounded-2xl border-2 font-bold py-4 text-lg active:scale-[0.98] transition;
+    border-color: #334155;
+    color: #94a3b8;
+  }
+  .btn-secondary:disabled {
+    opacity: 0.5;
+  }
+  .score-btn {
+    @apply flex items-center justify-center rounded-2xl text-3xl font-black shadow-lg active:scale-95 transition select-none;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+  }
 }
