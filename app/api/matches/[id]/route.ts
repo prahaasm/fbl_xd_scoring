@@ -118,6 +118,52 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       break;
     }
 
+    case 'setScore': {
+      const score_a = Number(body.score_a);
+      const score_b = Number(body.score_b);
+      const finish = Boolean(body.finish);
+
+      if (!Number.isInteger(score_a) || !Number.isInteger(score_b)) {
+        return NextResponse.json({ error: 'Scores must be whole numbers' }, { status: 400 });
+      }
+      if (score_a < 0 || score_b < 0) {
+        return NextResponse.json({ error: 'Scores cannot be negative' }, { status: 400 });
+      }
+      if (score_a > 21 || score_b > 21) {
+        return NextResponse.json({ error: 'Scores cannot exceed 21' }, { status: 400 });
+      }
+
+      if (finish) {
+        const validFinish =
+          score_a !== score_b &&
+          Math.max(score_a, score_b) === 21 &&
+          Math.min(score_a, score_b) <= 20;
+        if (!validFinish) {
+          return NextResponse.json(
+            { error: 'Invalid final score. One team must reach exactly 21 (20-20 is Golden Point).' },
+            { status: 400 }
+          );
+        }
+      }
+
+      const history: ScoreSnapshot[] = [
+        ...(match.history ?? []),
+        { score_a: match.score_a, score_b: match.score_b },
+      ].slice(-30);
+
+      update = { score_a, score_b, history };
+
+      if (finish) {
+        update.status = 'completed';
+        update.winner = score_a > score_b ? match.team_a : match.team_b;
+        update.completed_at = new Date().toISOString();
+      } else if (match.status === 'upcoming') {
+        update.status = 'live';
+        update.started_at = match.started_at ?? new Date().toISOString();
+      }
+      break;
+    }
+
     case 'setWinner': {
       if (session.role !== 'admin') {
         return NextResponse.json({ error: 'Only admin can change the winner' }, { status: 403 });

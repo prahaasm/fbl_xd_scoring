@@ -8,7 +8,12 @@ export interface StandingRow {
   lost: number;
   pointsFor: number;
   pointsAgainst: number;
-  diff: number;
+  leaguePoints: number;
+}
+
+function leaguePointsForResult(winnerScore: number, loserScore: number): { winner: number; loser: number } {
+  if (loserScore >= 14) return { winner: 3, loser: 1 };
+  return { winner: 4, loser: 0 };
 }
 
 export function computeStandings(teams: Team[], matches: Match[]): StandingRow[] {
@@ -23,7 +28,7 @@ export function computeStandings(teams: Team[], matches: Match[]): StandingRow[]
       lost: 0,
       pointsFor: 0,
       pointsAgainst: 0,
-      diff: 0,
+      leaguePoints: 0,
     });
   }
 
@@ -45,17 +50,19 @@ export function computeStandings(teams: Team[], matches: Match[]): StandingRow[]
     if (match.winner === a.id) {
       a.won += 1;
       b.lost += 1;
+      const pts = leaguePointsForResult(match.score_a, match.score_b);
+      a.leaguePoints += pts.winner;
+      b.leaguePoints += pts.loser;
     } else if (match.winner === b.id) {
       b.won += 1;
       a.lost += 1;
+      const pts = leaguePointsForResult(match.score_b, match.score_a);
+      b.leaguePoints += pts.winner;
+      a.leaguePoints += pts.loser;
     }
   }
 
-  for (const row of rows.values()) {
-    row.diff = row.pointsFor - row.pointsAgainst;
-  }
-
   return [...rows.values()].sort(
-    (x, y) => y.won - x.won || y.diff - x.diff || y.pointsFor - x.pointsFor
+    (x, y) => y.won - x.won || y.leaguePoints - x.leaguePoints || y.pointsFor - x.pointsFor
   );
 }

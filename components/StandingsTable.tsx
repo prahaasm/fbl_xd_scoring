@@ -15,7 +15,7 @@ export default function StandingsTable({ title, rows }: { title: string; rows: S
               <th className="px-3 py-2.5 text-center">L</th>
               <th className="px-3 py-2.5 text-center">PF</th>
               <th className="px-3 py-2.5 text-center">PA</th>
-              <th className="px-3 py-2.5 text-center">Diff</th>
+              <th className="px-3 py-2.5 text-center">LP</th>
             </tr>
           </thead>
           <tbody>
@@ -33,8 +33,8 @@ export default function StandingsTable({ title, rows }: { title: string; rows: S
                 <td className="px-3 py-2.5 text-center">{r.lost}</td>
                 <td className="px-3 py-2.5 text-center">{r.pointsFor}</td>
                 <td className="px-3 py-2.5 text-center">{r.pointsAgainst}</td>
-                <td className={`px-3 py-2.5 text-center font-bold ${r.diff > 0 ? 'text-green-400' : r.diff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                  {r.diff > 0 ? '+' : ''}{r.diff}
+                <td className="px-3 py-2.5 text-center font-bold text-green-400">
+                  {r.leaguePoints}
                 </td>
               </tr>
             ))}

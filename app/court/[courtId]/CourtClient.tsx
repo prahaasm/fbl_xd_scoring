@@ -36,8 +36,13 @@ export default function CourtClient({
   const [celebrate, setCelebrate] = useState<Match | null>(null);
   const goldenAnnounced = useRef(new Set<number>());
   const celebratedIds = useRef(new Set<number>());
+  const [showPicker, setShowPicker] = useState(false);
+  const [manualEdits, setManualEdits] = useState<{ id: number; a: string; b: string } | null>(null);
+  const [manualError, setManualError] = useState('');
 
   const active = matches.find((m) => m.id === activeId) ?? null;
+  const manualA = manualEdits && manualEdits.id === active?.id ? manualEdits.a : String(active?.score_a ?? '');
+  const manualB = manualEdits && manualEdits.id === active?.id ? manualEdits.b : String(active?.score_b ?? '');
 
   useEffect(() => {
     if (!active) return;
@@ -62,11 +67,16 @@ export default function CourtClient({
     if (!active || busy) return;
     setBusy(true);
     try {
-      await fetch(`/api/matches/${active.id}`, {
+      const res = await fetch(`/api/matches/${active.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...extra }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return { error: data.error as string | undefined };
+      }
+      return { error: undefined };
     } finally {
       setBusy(false);
     }
@@ -77,6 +87,52 @@ export default function CourtClient({
       .filter((m) => m.status === 'upcoming' && m.id !== active?.id)
       .sort((a, b) => a.match_number - b.match_number);
     setActiveId(upcoming[0]?.id ?? null);
+  }
+
+  async function submitManualScore(finish: boolean) {
+    if (!active) return;
+    const score_a = Number(manualA);
+    const score_b = Number(manualB);
+
+    if (manualA.trim() === '' || manualB.trim() === '' || !Number.isInteger(score_a) || !Number.isInteger(score_b)) {
+      setManualError('Enter valid whole-number scores for both teams.');
+      return;
+    }
+    if (score_a < 0 || score_b < 0) {
+      setManualError('Scores cannot be negative.');
+      return;
+    }
+    if (score_a > 21 || score_b > 21) {
+      setManualError('Scores cannot exceed 21.');
+      return;
+    }
+    if (finish) {
+      const validFinish = score_a !== score_b && Math.max(score_a, score_b) === 21 && Math.min(score_a, score_b) <= 20;
+      if (!validFinish) {
+        setManualError('Invalid final score. One team must reach exactly 21 (20-20 is Golden Point).');
+        return;
+      }
+    }
+
+    setManualError('');
+    const result = await callAction('setScore', { score_a, score_b, finish });
+    if (result?.error) setManualError(result.error);
+    else setManualEdits(null);
+  }
+
+  function setManualScore(team: 'a' | 'b', value: string) {
+    if (!active) return;
+    setManualEdits((prev) => {
+      const base = prev && prev.id === active.id ? prev : { id: active.id, a: manualA, b: manualB };
+      return { ...base, [team]: value };
+    });
+  }
+
+  function selectMatch(id: number) {
+    setActiveId(id);
+    setManualEdits(null);
+    setManualError('');
+    setShowPicker(false);
   }
 
   async function logout() {
@@ -117,6 +173,41 @@ export default function CourtClient({
         </div>
       </header>
 
+      <button
+        className="btn-secondary mb-4 text-xs"
+        onClick={() => setShowPicker((v) => !v)}
+      >
+        {showPicker ? 'Close Match List' : 'Select Match'}
+      </button>
+
+      {showPicker && (
+        <div className="mb-4 rounded-xl border border-slate-700 bg-slate-800 max-h-64 overflow-y-auto">
+          {matches
+            .slice()
+            .sort((a, b) => a.match_number - b.match_number)
+            .map((m) => {
+              const mTeamA = m.team_a ? teamMap.get(m.team_a) ?? 'TBD' : 'TBD';
+              const mTeamB = m.team_b ? teamMap.get(m.team_b) ?? 'TBD' : 'TBD';
+              const label =
+                m.stage === 'knockout' ? m.knockout_stage : `Round ${m.round}`;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => selectMatch(m.id)}
+                  className={`w-full text-left px-3 py-2.5 border-t border-slate-700 first:border-t-0 text-xs flex items-center justify-between gap-2 ${
+                    m.id === active.id ? 'bg-slate-700' : ''
+                  }`}
+                >
+                  <span className="text-slate-200 font-medium">
+                    {label} - {mTeamA} vs {mTeamB}
+                  </span>
+                  <Badge status={m.status} />
+                </button>
+              );
+            })}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 mb-4">
         <TeamScore
           name={teamA}
@@ -132,6 +223,47 @@ export default function CourtClient({
           onDec={() => callAction('decrement', { team: 'b' })}
           disabled={busy || active.status !== 'live'}
         />
+      </div>
+
+      <div className="rounded-xl border border-slate-700 bg-slate-800 p-3 mb-4">
+        <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Manual Score Entry</p>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-slate-400 truncate">{teamA} Score</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={21}
+              value={manualA}
+              onChange={(e) => setManualScore('a', e.target.value)}
+              disabled={busy}
+              className="rounded-lg bg-slate-900 border border-slate-700 text-white text-center text-xl font-bold py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-slate-400 truncate">{teamB} Score</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={21}
+              value={manualB}
+              onChange={(e) => setManualScore('b', e.target.value)}
+              disabled={busy}
+              className="rounded-lg bg-slate-900 border border-slate-700 text-white text-center text-xl font-bold py-2"
+            />
+          </label>
+        </div>
+        {manualError && <p className="text-red-400 text-xs font-medium mb-3">{manualError}</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <button className="btn-secondary" disabled={busy} onClick={() => submitManualScore(false)}>
+            Save Score
+          </button>
+          <button className="btn-primary" disabled={busy} onClick={() => submitManualScore(true)}>
+            Finish Match
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
