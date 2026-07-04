@@ -50,11 +50,16 @@ export default function DashboardClient({
   async function callAction(matchId: number, action: string, extra?: Record<string, unknown>) {
     setBusyId(matchId);
     try {
-      await fetch(`/api/matches/${matchId}`, {
+      const res = await fetch(`/api/matches/${matchId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...extra }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return { error: data.error as string | undefined };
+      }
+      return { error: undefined };
     } finally {
       setBusyId(null);
     }
@@ -187,11 +192,50 @@ function AdminMatchRow({
   match: Match;
   teamMap: Map<string, string>;
   busy: boolean;
-  onAction: (id: number, action: string, extra?: Record<string, unknown>) => void;
+  onAction: (
+    id: number,
+    action: string,
+    extra?: Record<string, unknown>
+  ) => Promise<{ error?: string } | undefined>;
 }) {
   const teamA = match.team_a ? teamMap.get(match.team_a) ?? 'TBD' : 'TBD';
   const teamB = match.team_b ? teamMap.get(match.team_b) ?? 'TBD' : 'TBD';
   const scoreDisabled = busy || match.status !== 'live';
+
+  const [manualEdit, setManualEdit] = useState<{ a: string; b: string } | null>(null);
+  const [manualError, setManualError] = useState('');
+  const manualA = manualEdit ? manualEdit.a : String(match.score_a);
+  const manualB = manualEdit ? manualEdit.b : String(match.score_b);
+
+  async function submitManualScore(finish: boolean) {
+    const score_a = Number(manualA);
+    const score_b = Number(manualB);
+
+    if (manualA.trim() === '' || manualB.trim() === '' || !Number.isInteger(score_a) || !Number.isInteger(score_b)) {
+      setManualError('Enter valid whole-number scores for both teams.');
+      return;
+    }
+    if (score_a < 0 || score_b < 0) {
+      setManualError('Scores cannot be negative.');
+      return;
+    }
+    if (score_a > 21 || score_b > 21) {
+      setManualError('Scores cannot exceed 21.');
+      return;
+    }
+    if (finish) {
+      const validFinish = score_a !== score_b && Math.max(score_a, score_b) === 21 && Math.min(score_a, score_b) <= 20;
+      if (!validFinish) {
+        setManualError('Invalid final score. One team must reach exactly 21 (20-20 is Golden Point).');
+        return;
+      }
+    }
+
+    setManualError('');
+    const result = await onAction(match.id, 'setScore', { score_a, score_b, finish });
+    if (result?.error) setManualError(result.error);
+    else setManualEdit(null);
+  }
 
   return (
     <div className="rounded-xl border border-slate-700 bg-slate-800 p-3">
@@ -242,6 +286,50 @@ function AdminMatchRow({
           </button>
         </div>
       </div>
+
+      <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-2 mb-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Manual Entry</p>
+        <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={21}
+            value={manualA}
+            disabled={busy}
+            onChange={(e) => setManualEdit({ a: e.target.value, b: manualEdit ? manualEdit.b : manualB })}
+            className="rounded-lg bg-slate-900 border border-slate-700 text-white text-center text-sm font-bold py-1"
+          />
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={21}
+            value={manualB}
+            disabled={busy}
+            onChange={(e) => setManualEdit({ a: manualEdit ? manualEdit.a : manualA, b: e.target.value })}
+            className="rounded-lg bg-slate-900 border border-slate-700 text-white text-center text-sm font-bold py-1"
+          />
+        </div>
+        {manualError && <p className="text-red-400 text-[10px] font-medium mb-1.5">{manualError}</p>}
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            disabled={busy}
+            className="rounded-lg bg-slate-700 text-slate-200 py-1 text-xs font-bold disabled:opacity-40"
+            onClick={() => submitManualScore(false)}
+          >
+            Save Score
+          </button>
+          <button
+            disabled={busy}
+            className="rounded-lg bg-green-500 text-slate-900 py-1 text-xs font-bold disabled:opacity-40"
+            onClick={() => submitManualScore(true)}
+          >
+            Finish Match
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-1 text-xs">
         {match.status === 'upcoming' && (
           <button
