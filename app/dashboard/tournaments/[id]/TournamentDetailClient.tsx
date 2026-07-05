@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import BackHome from '@/components/BackHome';
+import BackLink from '@/components/BackLink';
 import AdminMatchRow from '@/components/AdminMatchRow';
 import { supabasePublic } from '@/lib/supabase/public';
 import { useRealtimeMatches } from '@/lib/useRealtimeMatches';
@@ -59,7 +59,7 @@ export default function TournamentDetailClient({
   return (
     <main className="flex-1 mx-auto w-full max-w-md px-4 py-6 pb-10">
       <div className="mb-4">
-        <BackHome />
+        <BackLink href="/dashboard/tournaments" label="Tournaments" />
       </div>
       <h1 className="text-2xl font-black text-white mb-1 text-center">{tournament.name}</h1>
       <p className="text-xs text-slate-500 text-center mb-6">

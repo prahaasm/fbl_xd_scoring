@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import BackHome from '@/components/BackHome';
+import BackLink from '@/components/BackLink';
 import type { Tournament, TournamentEventType, TournamentFormat } from '@/lib/types';
 
 const EVENT_TYPES: { value: TournamentEventType; label: string }[] = [
@@ -92,7 +92,7 @@ export default function TournamentsClient({ initialTournaments }: { initialTourn
   return (
     <main className="flex-1 mx-auto w-full max-w-md px-4 py-6 pb-10">
       <div className="mb-6 flex items-center justify-between">
-        <BackHome />
+        <BackLink href="/dashboard" label="Dashboard" />
         <button
           onClick={() => setShowForm((s) => !s)}
           className="text-xs font-bold text-green-400 hover:text-green-300 transition"

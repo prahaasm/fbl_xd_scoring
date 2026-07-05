@@ -10,6 +10,11 @@ export default function DashboardHome() {
 
   return (
     <main className="flex-1 mx-auto w-full max-w-md px-4 py-6 pb-10">
+      <div className="mb-4">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-200 transition">
+          ← View Site
+        </Link>
+      </div>
       <h1 className="text-2xl font-black text-white mb-6 text-center">Admin Dashboard</h1>
       <div className="grid gap-3">
         <Link href="/dashboard/tournaments" className="btn-primary text-center">
