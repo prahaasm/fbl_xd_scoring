@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { supabasePublic } from '@/lib/supabase/public';
 import type { Match, Team, Tournament } from '@/lib/types';
 import Badge from '@/components/Badge';
@@ -16,6 +17,14 @@ export default async function HomePage() {
     return (
       <main className="flex-1 mx-auto w-full max-w-md px-4 pb-10">
         <header className="text-center pt-16 pb-8">
+          <Image
+            src="/FBL_logo.png"
+            alt="FBL Badminton"
+            width={160}
+            height={160}
+            priority
+            className="mx-auto mb-4 w-32 h-auto"
+          />
           <h1 className="text-2xl font-black text-white mb-2">No Live Tournament</h1>
           <p className="text-sm text-slate-400">Check back once an admin marks a tournament as Live.</p>
         </header>
@@ -58,6 +67,14 @@ export default async function HomePage() {
     <main className="flex-1 mx-auto w-full max-w-md px-4 pb-10">
       {/* Hero */}
       <header className="text-center pt-10 pb-8">
+        <Image
+          src="/FBL_logo.png"
+          alt="FBL Badminton"
+          width={160}
+          height={160}
+          priority
+          className="mx-auto mb-3 w-28 h-auto"
+        />
         <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-full px-3 py-1 mb-4">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
           <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Live Now</span>

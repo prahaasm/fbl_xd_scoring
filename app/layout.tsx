@@ -5,8 +5,11 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "FBL XD Tournament July 2026",
-  description: "Live scoring for the FBL XD Tournament, July 2026 at Playzone.",
+  title: "FBL Tournaments",
+  description: "Live scoring for FBL tournaments.",
+  icons: {
+    icon: "/FBL_logo.png",
+  },
 };
 
 export const viewport: Viewport = {
