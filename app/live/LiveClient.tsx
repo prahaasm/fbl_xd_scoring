@@ -5,17 +5,41 @@ import { supabasePublic } from '@/lib/supabase/public';
 import { useRealtimeMatches } from '@/lib/useRealtimeMatches';
 import Badge from '@/components/Badge';
 import BackHome from '@/components/BackHome';
-import type { Match, Team } from '@/lib/types';
+import type { Court, Match, Team } from '@/lib/types';
 
-export default function LiveClient({ initialMatches, teams }: { initialMatches: Match[]; teams: Team[] }) {
+export default function LiveClient({
+  tournamentId,
+  initialMatches,
+  teams,
+  courts,
+}: {
+  tournamentId?: string;
+  initialMatches: Match[];
+  teams: Team[];
+  courts: Court[];
+}) {
   const matches = useRealtimeMatches(initialMatches, () =>
-    supabasePublic
-      .from('matches')
-      .select('*')
-      .order('match_number')
-      .then((r) => ({ data: r.data as Match[] | null }))
+    tournamentId
+      ? supabasePublic
+          .from('matches')
+          .select('*')
+          .eq('tournament_id', tournamentId)
+          .order('match_number')
+          .then((r) => ({ data: r.data as Match[] | null }))
+      : Promise.resolve({ data: [] })
   );
   const teamMap = useMemo(() => new Map(teams.map((t) => [t.id, t.team_name])), [teams]);
+
+  if (!tournamentId) {
+    return (
+      <main className="flex-1 mx-auto w-full max-w-md px-4 py-6 pb-10">
+        <div className="mb-6">
+          <BackHome />
+        </div>
+        <p className="text-sm text-slate-500 italic text-center">No live tournament right now</p>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 mx-auto w-full max-w-md px-4 py-6 pb-10">
@@ -24,8 +48,8 @@ export default function LiveClient({ initialMatches, teams }: { initialMatches: 
       </div>
       <h1 className="text-2xl font-black text-white mb-6 text-center">Live Scores</h1>
       <div className="space-y-3">
-        {[1, 2, 3].map((court) => {
-          const courtMatches = matches.filter((m) => m.court === court);
+        {courts.map((court) => {
+          const courtMatches = matches.filter((m) => m.court_id === court.id);
           const current =
             courtMatches.find((m) => m.status === 'live') ??
             courtMatches.find((m) => m.status === 'upcoming') ??
@@ -33,7 +57,7 @@ export default function LiveClient({ initialMatches, teams }: { initialMatches: 
           const isLive = current?.status === 'live';
           return (
             <div
-              key={court}
+              key={court.id}
               className={`rounded-xl border p-4 transition ${
                 isLive
                   ? 'border-blue-500/40 bg-blue-500/5 shadow-lg shadow-blue-500/5'
@@ -41,14 +65,14 @@ export default function LiveClient({ initialMatches, teams }: { initialMatches: 
               }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-bold text-white">Court {court}</span>
+                <span className="text-sm font-bold text-white">{court.name}</span>
                 {current && <Badge status={current.status} />}
               </div>
               {!current && <p className="text-sm text-slate-500 italic">No matches</p>}
               {current && (
                 <div>
                   <p className="text-xs text-slate-500 mb-2">
-                    {current.stage === 'knockout' ? current.knockout_stage : `Round ${current.round}`}
+                    {current.stage === 'knockout' ? current.bracket_round : `Round ${current.round}`}
                   </p>
                   <ScoreLine
                     team={current.team_a ? teamMap.get(current.team_a) ?? 'TBD' : 'TBD'}

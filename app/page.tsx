@@ -1,14 +1,41 @@
 import Link from 'next/link';
 import { supabasePublic } from '@/lib/supabase/public';
-import type { Match, Team } from '@/lib/types';
+import type { Match, Team, Tournament } from '@/lib/types';
 import Badge from '@/components/Badge';
 
 export const revalidate = 0;
 
 export default async function HomePage() {
+  const { data: tournament } = await supabasePublic
+    .from('tournaments')
+    .select('*')
+    .eq('status', 'live')
+    .maybeSingle<Tournament>();
+
+  if (!tournament) {
+    return (
+      <main className="flex-1 mx-auto w-full max-w-md px-4 pb-10">
+        <header className="text-center pt-16 pb-8">
+          <h1 className="text-2xl font-black text-white mb-2">No Live Tournament</h1>
+          <p className="text-sm text-slate-400">Check back once an admin marks a tournament as Live.</p>
+        </header>
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/login" className="btn-secondary col-span-2">
+            Login
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   const [{ data: matches, error: matchesError }, { data: teams, error: teamsError }] = await Promise.all([
-    supabasePublic.from('matches').select('*').order('match_number').returns<Match[]>(),
-    supabasePublic.from('teams').select('*').returns<Team[]>(),
+    supabasePublic
+      .from('matches')
+      .select('*')
+      .eq('tournament_id', tournament.id)
+      .order('match_number')
+      .returns<Match[]>(),
+    supabasePublic.from('teams').select('*').eq('tournament_id', tournament.id).returns<Team[]>(),
   ]);
 
   if (matchesError) console.error('[home page] matches query failed:', matchesError);
@@ -33,21 +60,22 @@ export default async function HomePage() {
       <header className="text-center pt-10 pb-8">
         <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-full px-3 py-1 mb-4">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">July 2026 · Playzone</span>
+          <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Live Now</span>
         </div>
-        <h1 className="text-3xl font-black text-white leading-tight mb-1">FBL XD Tournament</h1>
-        <p className="text-sm text-slate-400">Mixed Doubles Badminton</p>
+        <h1 className="text-3xl font-black text-white leading-tight mb-1">{tournament.name}</h1>
+        {tournament.venue && <p className="text-sm text-slate-400">{tournament.venue}</p>}
 
-        {/* Progress bar */}
-        <div className="mt-5 mx-auto max-w-xs">
-          <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-            <span>Group stage</span>
-            <span>{groupDone}/{groupMatches.length} matches</span>
+        {groupMatches.length > 0 && (
+          <div className="mt-5 mx-auto max-w-xs">
+            <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+              <span>Group stage</span>
+              <span>{groupDone}/{groupMatches.length} matches</span>
+            </div>
+            <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all" style={{ width: `${progress}%` }} />
+            </div>
           </div>
-          <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
+        )}
       </header>
 
       <Section title="Live Matches">
@@ -72,13 +100,13 @@ export default async function HomePage() {
       </Section>
 
       <div className="grid grid-cols-2 gap-3 mt-6">
-        <Link href="/leaderboard" className="btn-primary col-span-2">
+        <Link href={`/leaderboard?tournament=${tournament.id}`} className="btn-primary col-span-2">
           Leaderboard
         </Link>
-        <Link href="/live" className="btn-primary col-span-2" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+        <Link href={`/live?tournament=${tournament.id}`} className="btn-primary col-span-2" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           Live Scores
         </Link>
-        <Link href="/knockout" className="btn-secondary">
+        <Link href={`/knockout?tournament=${tournament.id}`} className="btn-secondary">
           Bracket
         </Link>
         <Link href="/login" className="btn-secondary">
@@ -114,7 +142,7 @@ function MatchRow({ match, teamMap }: { match: Match; teamMap: Map<string, strin
     }`}>
       <div>
         <div className="text-xs text-slate-500 mb-0.5">
-          {match.stage === 'knockout' ? match.knockout_stage : `Round ${match.round} · Court ${match.court}`}
+          {match.stage === 'knockout' ? match.bracket_round : `Round ${match.round}`}
         </div>
         <div className="text-sm font-semibold text-slate-100">
           {teamA} <span className="text-slate-500">vs</span> {teamB}

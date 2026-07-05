@@ -5,39 +5,40 @@ import { supabasePublic } from '@/lib/supabase/public';
 import { useRealtimeMatches } from '@/lib/useRealtimeMatches';
 import Badge from '@/components/Badge';
 import BackHome from '@/components/BackHome';
-import type { KnockoutStage, Match, Team } from '@/lib/types';
-
-const ORDER: KnockoutStage[] = ['SF1', 'QF', 'SF2', 'F'];
-const LABELS: Record<KnockoutStage, string> = {
-  SF1: 'Semi Final 1',
-  QF: 'Quarter Final',
-  SF2: 'Semi Final 2',
-  F: 'Final',
-};
-
-const ACCENTS: Record<KnockoutStage, string> = {
-  SF1: 'border-slate-700 bg-slate-800/60',
-  QF: 'border-slate-700 bg-slate-800/60',
-  SF2: 'border-slate-700 bg-slate-800/60',
-  F: 'border-yellow-500/40 bg-yellow-500/5 shadow-lg shadow-yellow-500/5',
-};
+import type { Match, Team } from '@/lib/types';
 
 export default function KnockoutClient({
+  tournamentId,
   initialMatches,
   teams,
 }: {
+  tournamentId: string | undefined;
   initialMatches: Match[];
   teams: Team[];
 }) {
   const matches = useRealtimeMatches(initialMatches, () =>
-    supabasePublic
-      .from('matches')
-      .select('*')
-      .order('match_number')
-      .then((r) => ({ data: r.data as Match[] | null }))
+    tournamentId
+      ? supabasePublic
+          .from('matches')
+          .select('*')
+          .eq('tournament_id', tournamentId)
+          .order('match_number')
+          .then((r) => ({ data: r.data as Match[] | null }))
+      : Promise.resolve({ data: [] })
   );
   const teamMap = useMemo(() => new Map(teams.map((t) => [t.id, t.team_name])), [teams]);
   const knockoutMatches = matches.filter((m) => m.stage === 'knockout');
+
+  const rounds = useMemo(() => {
+    const byRound = new Map<number, Match[]>();
+    for (const m of knockoutMatches) {
+      const r = m.round ?? 0;
+      byRound.set(r, [...(byRound.get(r) ?? []), m]);
+    }
+    return [...byRound.entries()].sort(([a], [b]) => a - b);
+  }, [knockoutMatches]);
+
+  const totalRounds = rounds.length;
 
   return (
     <main className="flex-1 mx-auto w-full max-w-md px-4 py-6 pb-10">
@@ -48,38 +49,55 @@ export default function KnockoutClient({
       {knockoutMatches.length === 0 && (
         <p className="text-sm text-slate-500 italic text-center">Bracket not generated yet</p>
       )}
-      <div className="space-y-3">
-        {ORDER.map((stage) => {
-          const match = knockoutMatches.find((m) => m.knockout_stage === stage);
-          if (!match) return null;
-          const teamA = match.team_a ? teamMap.get(match.team_a) ?? 'TBD' : 'TBD';
-          const teamB = match.team_b ? teamMap.get(match.team_b) ?? 'TBD' : 'TBD';
-          const isFinal = stage === 'F';
+      <div className="space-y-4">
+        {rounds.map(([round, ms], i) => {
+          const isFinal = i === totalRounds - 1;
           return (
-            <div key={stage} className={`rounded-xl border p-4 ${ACCENTS[stage]}`}>
-              <div className="flex items-center justify-between mb-3">
-                <span className={`text-sm font-bold ${isFinal ? 'text-yellow-300' : 'text-white'}`}>
-                  {isFinal ? '🏆 ' : ''}{LABELS[stage]}
-                </span>
-                <Badge status={match.status} />
+            <div key={round}>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
+                {ms[0].bracket_round}
+              </h2>
+              <div className="space-y-3">
+                {ms.map((match) => {
+                  const teamA = match.team_a ? teamMap.get(match.team_a) ?? 'TBD' : 'TBD';
+                  const teamB = match.team_b ? teamMap.get(match.team_b) ?? 'TBD' : 'TBD';
+                  return (
+                    <div
+                      key={match.id}
+                      className={`rounded-xl border p-4 ${
+                        isFinal
+                          ? 'border-yellow-500/40 bg-yellow-500/5 shadow-lg shadow-yellow-500/5'
+                          : 'border-slate-700 bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className={`text-sm font-bold ${isFinal ? 'text-yellow-300' : 'text-white'}`}>
+                          {isFinal ? '🏆 ' : ''}
+                          {match.bracket_round}
+                        </span>
+                        <Badge status={match.status} />
+                      </div>
+                      <TeamLine
+                        name={teamA}
+                        score={match.score_a}
+                        isWinner={!!match.winner && match.winner === match.team_a}
+                        showScore={match.status !== 'upcoming'}
+                      />
+                      <div className="flex items-center gap-2 my-1">
+                        <div className="flex-1 border-t border-slate-700/50" />
+                        <span className="text-xs text-slate-600 font-bold">VS</span>
+                        <div className="flex-1 border-t border-slate-700/50" />
+                      </div>
+                      <TeamLine
+                        name={teamB}
+                        score={match.score_b}
+                        isWinner={!!match.winner && match.winner === match.team_b}
+                        showScore={match.status !== 'upcoming'}
+                      />
+                    </div>
+                  );
+                })}
               </div>
-              <TeamLine
-                name={teamA}
-                score={match.score_a}
-                isWinner={!!match.winner && match.winner === match.team_a}
-                showScore={match.status !== 'upcoming'}
-              />
-              <div className="flex items-center gap-2 my-1">
-                <div className="flex-1 border-t border-slate-700/50" />
-                <span className="text-xs text-slate-600 font-bold">VS</span>
-                <div className="flex-1 border-t border-slate-700/50" />
-              </div>
-              <TeamLine
-                name={teamB}
-                score={match.score_b}
-                isWinner={!!match.winner && match.winner === match.team_b}
-                showScore={match.status !== 'upcoming'}
-              />
             </div>
           );
         })}

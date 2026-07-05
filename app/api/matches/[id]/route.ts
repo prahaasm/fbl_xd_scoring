@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSession } from '@/lib/auth';
-import type { Match, ScoreSnapshot } from '@/lib/types';
+import type { Court, Match, ScoreSnapshot } from '@/lib/types';
 
 const WIN_SCORE = 21;
 
@@ -30,8 +30,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Match not found' }, { status: 404 });
   }
 
-  if (session.role !== 'admin' && session.role !== `court${match.court}`) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (session.role !== 'admin') {
+    const { data: court } = await supabaseAdmin
+      .from('courts')
+      .select('*')
+      .eq('id', match.court_id)
+      .order('sort_order')
+      .single<Court>();
+
+    if (!court || session.role !== `court${court.sort_order}`) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   let update: Record<string, unknown> = {};
@@ -196,18 +205,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   if (updated.stage === 'knockout' && updated.status === 'completed' && updated.winner) {
-    await cascadeKnockout(updated.knockout_stage, updated.winner);
+    await advanceBracket(updated);
   }
 
   return NextResponse.json({ match: updated });
 }
 
-async function cascadeKnockout(knockoutStage: Match['knockout_stage'], winner: string) {
-  if (knockoutStage === 'QF') {
-    await supabaseAdmin.from('matches').update({ team_b: winner }).eq('knockout_stage', 'SF2');
-  } else if (knockoutStage === 'SF1') {
-    await supabaseAdmin.from('matches').update({ team_a: winner }).eq('knockout_stage', 'F');
-  } else if (knockoutStage === 'SF2') {
-    await supabaseAdmin.from('matches').update({ team_b: winner }).eq('knockout_stage', 'F');
+async function advanceBracket(match: Match) {
+  const loser = match.winner === match.team_a ? match.team_b : match.team_a;
+
+  if (match.next_match_id && match.next_match_slot) {
+    await supabaseAdmin
+      .from('matches')
+      .update({ [`team_${match.next_match_slot}`]: match.winner })
+      .eq('id', match.next_match_id);
+  }
+
+  if (match.loser_next_match_id && match.loser_next_match_slot && loser) {
+    await supabaseAdmin
+      .from('matches')
+      .update({ [`team_${match.loser_next_match_slot}`]: loser })
+      .eq('id', match.loser_next_match_id);
   }
 }

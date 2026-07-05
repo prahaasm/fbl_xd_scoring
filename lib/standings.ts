@@ -16,7 +16,7 @@ function leaguePointsForResult(winnerScore: number, loserScore: number): { winne
   return { winner: 4, loser: 0 };
 }
 
-export function computeStandings(teams: Team[], matches: Match[]): StandingRow[] {
+function buildRows(teams: Team[], matches: Match[]): Map<string, StandingRow> {
   const rows = new Map<string, StandingRow>();
 
   for (const team of teams) {
@@ -62,7 +62,88 @@ export function computeStandings(teams: Team[], matches: Match[]): StandingRow[]
     }
   }
 
-  return [...rows.values()].sort(
-    (x, y) => y.won - x.won || y.leaguePoints - x.leaguePoints || y.pointsFor - x.pointsFor
+  return rows;
+}
+
+/**
+ * Ranks teams per the official tie-break rules:
+ * 1. Wins (desc)
+ * 2. For exactly 2 tied teams: head-to-head winner (if they played and it's decisive)
+ * 3. League points (desc)
+ * 4. For 3+ tied teams: points scored among just the tied teams (desc)
+ * 5. Total points for (desc)
+ * 6. Team name (asc) as final deterministic fallback
+ */
+export function rankTeams(teams: Team[], matches: Match[]): StandingRow[] {
+  const rows = buildRows(teams, matches);
+  const completedGroupMatches = matches.filter(
+    (m) => m.stage === 'group' && m.status === 'completed' && m.team_a && m.team_b
   );
+
+  const winsGroups = new Map<number, StandingRow[]>();
+  for (const row of rows.values()) {
+    const group = winsGroups.get(row.won) ?? [];
+    group.push(row);
+    winsGroups.set(row.won, group);
+  }
+
+  const rankedGroups: StandingRow[][] = [];
+
+  for (const wins of [...winsGroups.keys()].sort((a, b) => b - a)) {
+    const group = winsGroups.get(wins)!;
+
+    if (group.length === 2) {
+      const [x, y] = group;
+      const headToHead = completedGroupMatches.find(
+        (m) =>
+          (m.team_a === x.id && m.team_b === y.id) || (m.team_a === y.id && m.team_b === x.id)
+      );
+
+      if (headToHead && headToHead.winner) {
+        rankedGroups.push(headToHead.winner === x.id ? [x, y] : [y, x]);
+        continue;
+      }
+
+      rankedGroups.push(
+        [...group].sort(
+          (a, b) =>
+            b.leaguePoints - a.leaguePoints ||
+            b.pointsFor - a.pointsFor ||
+            a.team_name.localeCompare(b.team_name)
+        )
+      );
+      continue;
+    }
+
+    if (group.length >= 3) {
+      const tiedIds = new Set(group.map((r) => r.id));
+      const pointsAmongTied = new Map<string, number>();
+      for (const row of group) pointsAmongTied.set(row.id, 0);
+
+      for (const match of completedGroupMatches) {
+        if (!tiedIds.has(match.team_a!) || !tiedIds.has(match.team_b!)) continue;
+        pointsAmongTied.set(match.team_a!, (pointsAmongTied.get(match.team_a!) ?? 0) + match.score_a);
+        pointsAmongTied.set(match.team_b!, (pointsAmongTied.get(match.team_b!) ?? 0) + match.score_b);
+      }
+
+      rankedGroups.push(
+        [...group].sort(
+          (a, b) =>
+            (pointsAmongTied.get(b.id) ?? 0) - (pointsAmongTied.get(a.id) ?? 0) ||
+            b.leaguePoints - a.leaguePoints ||
+            b.pointsFor - a.pointsFor ||
+            a.team_name.localeCompare(b.team_name)
+        )
+      );
+      continue;
+    }
+
+    rankedGroups.push(group);
+  }
+
+  return rankedGroups.flat();
+}
+
+export function computeStandings(teams: Team[], matches: Match[]): StandingRow[] {
+  return rankTeams(teams, matches);
 }

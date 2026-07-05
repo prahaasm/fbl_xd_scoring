@@ -10,10 +10,14 @@ import type { Match, Team } from '@/lib/types';
 
 export default function CourtClient({
   court,
+  tournamentId,
+  courtId,
   initialMatches,
   teams,
 }: {
   court: number;
+  tournamentId: string;
+  courtId: string;
   initialMatches: Match[];
   teams: Team[];
 }) {
@@ -21,7 +25,8 @@ export default function CourtClient({
     supabasePublic
       .from('matches')
       .select('*')
-      .eq('court', court)
+      .eq('tournament_id', tournamentId)
+      .eq('court_id', courtId)
       .order('match_number')
       .then((r) => ({ data: r.data as Match[] | null }))
   );
@@ -155,8 +160,8 @@ export default function CourtClient({
   const teamB = active.team_b ? teamMap.get(active.team_b) ?? 'TBD' : 'TBD';
   const progressLabel =
     active.stage === 'knockout'
-      ? active.knockout_stage
-      : `Round ${active.round} · Match ${active.match_number} / 42`;
+      ? active.bracket_round
+      : `Round ${active.round} · Match ${active.match_number}`;
 
   return (
     <main className="flex-1 flex flex-col mx-auto w-full max-w-md px-4 py-4 pb-8">
@@ -189,7 +194,7 @@ export default function CourtClient({
               const mTeamA = m.team_a ? teamMap.get(m.team_a) ?? 'TBD' : 'TBD';
               const mTeamB = m.team_b ? teamMap.get(m.team_b) ?? 'TBD' : 'TBD';
               const label =
-                m.stage === 'knockout' ? m.knockout_stage : `Round ${m.round}`;
+                m.stage === 'knockout' ? m.bracket_round : `Round ${m.round}`;
               return (
                 <button
                   key={m.id}
